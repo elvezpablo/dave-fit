@@ -6,7 +6,7 @@
   "scripts": {
     "images": "node scripts/build-images.mjs",
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "npm run images && astro build",
     "preview": "wrangler dev",
     "deploy": "astro build && wrangler deploy",
     "db:local": "wrangler d1 execute dave-fit --local --file=schema.sql",
