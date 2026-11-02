@@ -12,7 +12,7 @@
 	},
 	"d1_databases": [
 		{
-			"binding": "dave_fit",
+			"binding": "DB",
 			"database_name": "dave-fit",
 			"database_id": "5c2c5949-799d-401d-86f6-a8f69a7765e9"
 		}
