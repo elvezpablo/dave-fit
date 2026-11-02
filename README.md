@@ -7,6 +7,13 @@ as a 1989 stadium tour.
 
 Astro 5 (SSR) → Cloudflare Workers + D1.
 
+> **This repository must stay private.** The 148 source photos in `workouts/`
+> are committed with their original EXIF, which includes GPS coordinates of
+> where they were shot. That data is in git history permanently — removing it
+> means rewriting history, not a follow-up commit. Don't publish or fork this
+> repo. The derived WebP files under `public/ex/` that the app actually serves
+> have all metadata stripped, so the deployed site leaks nothing.
+
 ---
 
 ## Deploying
