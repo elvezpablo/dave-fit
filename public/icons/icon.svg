@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Appetite for Contraction">
+  <defs>
+    <linearGradient id="bolt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".34" stop-color="#22e7ff"/>
+      <stop offset=".5" stop-color="#ffffff"/>
+      <stop offset=".66" stop-color="#ff1e7a"/>
+      <stop offset="1" stop-color="#ffd9ec"/>
+    </linearGradient>
+    <radialGradient id="wash" cx=".3" cy="0" r="1">
+      <stop offset="0" stop-color="#9d4edd"/>
+      <stop offset=".6" stop-color="#1f0f38"/>
+      <stop offset="1" stop-color="#07030f"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#wash)"/>
+  <g filter="url(#glow)">
+    <path d="M300 48 148 286h86l-26 178 180-250h-92l40-166Z" fill="url(#bolt)" stroke="#ff1e7a" stroke-width="8" stroke-linejoin="round"/>
+  </g>
+</svg>

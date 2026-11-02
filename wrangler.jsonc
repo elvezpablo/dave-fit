@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dave-fit",
+  "main": "./dist/_worker.js/index.js",
+  "compatibility_date": "2025-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dave-fit",
+      // Filled in by: npx wrangler d1 create dave-fit
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+
+  "observability": { "enabled": true }
+
+  // Custom domain — uncomment and set once the hostname is decided:
+  // "routes": [{ "pattern": "shred.example.com", "custom_domain": true }]
+}

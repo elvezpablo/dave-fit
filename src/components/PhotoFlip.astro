@@ -1,0 +1,85 @@
+---
+/**
+ * The exercise demo. Cycles a folder's frames so the movement reads as motion.
+ *
+ * It is honest about provenance: only 20 of the 148 photos were confirmed
+ * per-image, the rest inherit their folder's label, and some folders are
+ * known to contain a different movement in every frame. Unverified frames
+ * still show, but say so.
+ */
+import photoIndex from '../data/photos.generated.json';
+
+interface Props {
+  slug: string;
+  /** Show every frame rather than just the verified ones. */
+  all?: boolean;
+  width?: 480 | 1080;
+  /** Auto-cycle the frames. */
+  animate?: boolean;
+  alt: string;
+}
+
+const { slug, all = true, width = 480, animate = true, alt } = Astro.props;
+
+type Ref = { file: string; stem: string; verified: boolean; gif?: boolean };
+const refs: Ref[] = ((photoIndex as Record<string, Ref[]>)[slug] ?? []).slice(0, all ? 8 : 3);
+const shown = all ? refs : refs.filter((r) => r.verified);
+const frames = shown.length ? shown : refs;
+const anyUnverified = frames.some((r) => !r.verified);
+---
+
+{frames.length === 0 ? (
+  <div class="photo-frame is-empty">
+    <p class="meta">No photo yet</p>
+  </div>
+) : (
+  <figure class="photo-frame" data-flip={animate && frames.length > 1 ? '' : null}>
+    <div class="photo-stack">
+      {frames.map((f, i) => (
+        <img
+          src={`/ex/${f.stem}-${width}.webp`}
+          alt={i === 0 ? alt : ''}
+          aria-hidden={i === 0 ? undefined : 'true'}
+          width={width}
+          height={Math.round((width * 3) / 4)}
+          loading="lazy"
+          decoding="async"
+          data-on={i === 0 ? '' : null}
+        />
+      ))}
+    </div>
+    {anyUnverified && <figcaption class="photo-note" title="Folder label, not confirmed per photo">unsorted</figcaption>}
+  </figure>
+)}
+
+<style>
+  .is-empty { display: grid; place-items: center; border-style: dashed; box-shadow: none; }
+</style>
+
+<script>
+  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  for (const frame of document.querySelectorAll<HTMLElement>('[data-flip]')) {
+    const imgs = [...frame.querySelectorAll<HTMLImageElement>('img')];
+    if (imgs.length < 2 || REDUCED) continue;
+
+    let i = 0;
+    let timer: number | undefined;
+
+    const show = (n: number) => {
+      imgs[i]?.removeAttribute('data-on');
+      i = n % imgs.length;
+      imgs[i]?.setAttribute('data-on', '');
+    };
+    const start = () => { timer ??= setInterval(() => show(i + 1), 600) as unknown as number; };
+    const stop = () => { clearInterval(timer); timer = undefined; };
+
+    // Only animate what's on screen — a catalog page has 31 of these.
+    new IntersectionObserver(
+      ([e]) => (e?.isIntersecting ? start() : stop()),
+      { threshold: 0.25 },
+    ).observe(frame);
+
+    frame.addEventListener('click', () => (timer ? stop() : start()));
+  }
+</script>

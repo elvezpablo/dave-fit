@@ -1,0 +1,37 @@
+{
+  "name": "dave-fit",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "images": "node scripts/build-images.mjs",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "wrangler dev",
+    "deploy": "astro build && wrangler deploy",
+    "db:local": "wrangler d1 execute dave-fit --local --file=schema.sql",
+    "db:remote": "wrangler d1 execute dave-fit --remote --file=schema.sql",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^12.6.10",
+    "astro": "^5.14.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261101.1",
+    "sharp": "^0.34.4",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.42.0"
+  },
+  "allowScripts": {
+    "sharp@0.35.5": true,
+    "sharp@0.34.5": true,
+    "esbuild@0.27.0": true,
+    "esbuild@0.27.7": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "workerd@1.20260114.0": true,
+    "workerd@1.20261023.1": true,
+    "fsevents@2.3.3": true
+  }
+}

@@ -1,0 +1,82 @@
+---
+import Shell from '../../layouts/Shell.astro';
+---
+
+<Shell title="Encore">
+  <div id="done" class="stack" style="--flow: 1.5rem">
+    <p class="empty" id="nothing" hidden>
+      Nothing to report. <a href="/">Build a setlist</a>.
+    </p>
+  </div>
+</Shell>
+
+<style is:global>
+  /* Global for the same reason as run.astro — this page is built with
+     innerHTML, so scoped selectors would never match. */
+  #done .hero { text-align: center; }
+  #done .score { font-family: var(--font-display); font-size: var(--step-4); line-height: 1; padding-bottom: .05em; }
+  #done .lines { list-style: none; margin: 0; padding: 0; border-top: var(--rule); }
+  #done .lines li { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: .75rem 0; border-bottom: var(--rule); }
+  #done .lines .what { font-family: var(--font-display); font-size: var(--step-1); text-transform: uppercase; line-height: 1.05; }
+  #done .lines .how { font-family: var(--font-mono); font-size: var(--step--1); color: var(--fg-mute); }
+  #done .lines .pts { font-family: var(--font-mono); color: var(--acid); white-space: nowrap; font-size: var(--step-1); }
+  #done .btn + .btn { margin-top: .6rem; }
+</style>
+
+<script>
+  import { submitWorkout, rememberSlugs } from '../../lib/offline';
+  import { itemPoints } from '../../lib/scoring';
+  import type { Intensity } from '../../data/exercises';
+
+  const raw = sessionStorage.getItem('afc:done');
+  const root = document.getElementById('done')!;
+
+  if (!raw) {
+    document.getElementById('nothing')!.hidden = false;
+  } else {
+    const live = JSON.parse(raw) as {
+      id: string; intensity: Intensity; startedAt: string;
+      tracks: { slug: string; stage: string; real: string; mode: 'reps' | 'hold'; target: number; actual: number; setsDone: number; perSide: boolean }[];
+    };
+
+    const done = live.tracks.filter((t) => t.setsDone > 0);
+    const scored = done.map((t) => ({ ...t, points: itemPoints(t.mode, t.actual, live.intensity) }));
+    const total = scored.reduce((n, t) => n + t.points, 0);
+    const amount = (t: (typeof scored)[number]) =>
+      t.mode === 'hold' ? `${t.setsDone} sets · ${t.actual}s held` : `${t.setsDone} sets · ${t.actual} reps`;
+
+    root.innerHTML = `
+      <div class="hero rise">
+        <p class="eyebrow">That's the show</p>
+        <p class="score chrome">${total.toLocaleString()}</p>
+        <p class="meta">points banked</p>
+      </div>
+      <ul class="lines rise">
+        ${scored
+          .map(
+            (t) => `<li>
+              <div><p class="what">${t.stage}</p><p class="how">${t.real} · ${amount(t)}</p></div>
+              <span class="pts">+${t.points}</span>
+            </li>`,
+          )
+          .join('')}
+      </ul>
+      <p class="meta" id="status" aria-live="polite">Posting to the billboard…</p>
+      <a class="btn" href="/billboard">See the billboard</a>
+      <a class="btn btn-ghost" href="/" style="width:100%">Back to the top</a>`;
+
+    rememberSlugs(done.map((t) => t.slug));
+
+    submitWorkout({
+      id: live.id,
+      intensity: live.intensity,
+      completedAt: new Date().toISOString(),
+      items: scored.map((t) => ({ slug: t.slug, actual: t.actual, setsDone: t.setsDone, target: t.target })),
+    }).then((landed) => {
+      document.getElementById('status')!.textContent = landed
+        ? 'Posted to the billboard.'
+        : "You're offline — this will post itself when you're back.";
+      sessionStorage.removeItem('afc:done');
+    });
+  }
+</script>

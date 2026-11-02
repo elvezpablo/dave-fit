@@ -1,0 +1,246 @@
+---
+import Shell from '../../layouts/Shell.astro';
+---
+
+<Shell title="On stage">
+  <div id="stage" class="stack" style="--flow: 1.4rem">
+    <p class="empty" id="nothing" hidden>
+      No setlist in progress. <a href="/">Build one</a>.
+    </p>
+  </div>
+</Shell>
+
+<style is:global>
+  /* Global, not scoped: this page renders itself with innerHTML, so Astro's
+     data-astro-cid attributes are never present on these nodes. Namespaced
+     under #stage so it stays contained. */
+  #stage .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+  #stage .now-stage { font-family: var(--font-display); font-size: var(--step-2); line-height: .95; text-transform: uppercase; padding-bottom: .06em; }
+  #stage .target { font-family: var(--font-mono); font-size: var(--step-1); color: var(--acid); letter-spacing: .08em; text-align: center; }
+  #stage .cues { margin: 0; padding-left: 1.1rem; color: var(--fg-mute); font-size: var(--step-0); }
+  #stage .cues li + li { margin-top: .25rem; }
+  #stage .counter { display: flex; align-items: center; justify-content: center; gap: 1.25rem; }
+  #stage .counter button {
+    width: 3.75rem; height: 3.75rem; flex: none;
+    border-radius: 50%; border: 2px solid var(--ice);
+    background: rgba(7,3,15,.7); color: var(--ice);
+    font-family: var(--font-body); font-size: 2rem; line-height: 1;
+    cursor: pointer; transition: box-shadow .15s, background .15s;
+  }
+  #stage .counter button:hover { box-shadow: var(--glow-ice); background: rgba(34,231,255,.12); }
+  #stage .counter button:active { transform: scale(.94); }
+  #stage .counter output {
+    font-family: var(--font-mono); font-size: var(--step-3); line-height: 1;
+    min-width: 3ch; text-align: center; color: var(--acid);
+    text-shadow: 0 0 14px rgba(216,255,46,.5);
+  }
+  #stage .row { display: flex; gap: .6rem; }
+  #stage .row .btn { flex: 1; }
+  #stage .art { max-width: 20rem; margin-inline: auto; }
+  #stage .phase-note { text-align: center; }
+  #stage .rep-dots { margin-block: .25rem; }
+</style>
+
+<script>
+  type Track = {
+    slug: string; stage: string; real: string; bucket: string;
+    mode: 'reps' | 'hold'; perSide: boolean; sets: number; target: number;
+    restSec: number; photos: string[]; actual: number; setsDone: number;
+  };
+  type Live = {
+    id: string; intensity: string; startedAt: string;
+    ti: number; si: number; tracks: Track[];
+  };
+
+  const KEY = 'afc:live';
+  const root = document.getElementById('stage')!;
+  const raw = sessionStorage.getItem(KEY);
+
+  if (!raw) {
+    document.getElementById('nothing')!.hidden = false;
+  } else {
+    run(JSON.parse(raw) as Live);
+  }
+
+  function run(live: Live) {
+    let timer: number | undefined;
+    const save = () => sessionStorage.setItem(KEY, JSON.stringify(live));
+    const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s % 60)).padStart(2, '0')}`;
+
+    // Short tone at the end of a countdown. Cheap, no asset to load.
+    function beep(freq = 660, ms = 160) {
+      try {
+        const ac = new AudioContext();
+        const osc = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.frequency.value = freq;
+        osc.type = 'square';
+        gain.gain.setValueAtTime(0.06, ac.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + ms / 1000);
+        osc.connect(gain).connect(ac.destination);
+        osc.start();
+        osc.stop(ac.currentTime + ms / 1000);
+      } catch { /* no audio, no problem */ }
+    }
+
+    function stop() { clearInterval(timer); timer = undefined; }
+
+    /** Countdown that paints a draining ring and calls back at zero. */
+    function countdown(total: number, onDone: () => void) {
+      let left = total;
+      const ring = root.querySelector<SVGCircleElement>('.clock-fill');
+      const time = root.querySelector<HTMLElement>('.clock-time');
+      const wrap = root.querySelector<HTMLElement>('.clock');
+      const CIRC = 2 * Math.PI * 70;
+
+      const paint = () => {
+        if (time) time.textContent = mmss(left);
+        if (ring) ring.style.strokeDashoffset = String(CIRC * (1 - left / total));
+        const frac = left / total;
+        wrap?.setAttribute('data-phase', frac > 0.55 ? 'early' : frac > 0.25 ? 'mid' : 'late');
+      };
+      paint();
+
+      stop();
+      timer = setInterval(() => {
+        left--;
+        paint();
+        if (left <= 3 && left > 0) beep(520, 90);
+        if (left <= 0) { stop(); beep(880, 320); onDone(); }
+      }, 1000) as unknown as number;
+    }
+
+    const ring = (sec: number) => `
+      <div class="clock" data-phase="early">
+        <svg class="clock-ring" viewBox="0 0 160 160" aria-hidden="true">
+          <circle class="clock-track" cx="80" cy="80" r="70"></circle>
+          <circle class="clock-fill" cx="80" cy="80" r="70"
+                  stroke-dasharray="${2 * Math.PI * 70}" stroke-dashoffset="0"></circle>
+        </svg>
+        <output class="clock-time" aria-live="off">${mmss(sec)}</output>
+      </div>`;
+
+    const art = (t: Track) =>
+      t.photos.length
+        ? `<div class="art"><figure class="photo-frame"><div class="photo-stack">${t.photos
+            .slice(0, 6)
+            .map((p, n) => `<img src="/ex/${p}-480.webp" alt="${n ? '' : t.real}" ${n ? 'aria-hidden="true"' : 'data-on'}>`)
+            .join('')}</div></figure></div>`
+        : '';
+
+    const dots = (t: Track) =>
+      `<div class="rep-dots" role="img" aria-label="Set ${t.setsDone + 1} of ${t.sets}">${Array.from(
+        { length: t.sets },
+        (_, i) => `<span class="rep-dot" ${i < t.setsDone ? 'data-done' : ''}></span>`,
+      ).join('')}</div>`;
+
+    const header = (t: Track, i: number) => `
+      <div class="head">
+        <div>
+          <p class="eyebrow">Track ${i + 1} of ${live.tracks.length}</p>
+          <h1 class="now-stage chrome">${t.stage}</h1>
+          <p class="real-name">${t.real}${t.perSide ? ' · each side' : ''}</p>
+        </div>
+        <span class="bucket-tag" data-bucket="${t.bucket}">${t.bucket}</span>
+      </div>`;
+
+    function finish() {
+      stop();
+      sessionStorage.setItem('afc:done', JSON.stringify(live));
+      sessionStorage.removeItem(KEY);
+      location.href = '/setlist/done';
+    }
+
+    function advance() {
+      const t = live.tracks[live.ti]!;
+      if (live.si < t.sets) return showWork();
+      if (live.ti < live.tracks.length - 1) { live.ti++; live.si = 0; save(); return showWork(); }
+      finish();
+    }
+
+    /** Rest between sets. Skippable — nobody wants to be held hostage. */
+    function showRest(sec: number) {
+      const next = live.tracks[live.si >= live.tracks[live.ti]!.sets ? Math.min(live.ti + 1, live.tracks.length - 1) : live.ti]!;
+      root.innerHTML = `
+        <p class="eyebrow phase-note">Intermission</p>
+        ${ring(sec)}
+        <p class="meta phase-note">Up next · ${next.stage}</p>
+        <button class="btn btn-ice" id="skip" type="button">Skip the break</button>`;
+      countdown(sec, advance);
+      document.getElementById('skip')!.onclick = () => { stop(); advance(); };
+    }
+
+    function showWork() {
+      const t = live.tracks[live.ti]!;
+      save();
+
+      if (t.mode === 'hold') {
+        root.innerHTML = `
+          ${header(t, live.ti)}
+          ${dots(t)}
+          ${ring(t.target)}
+          <p class="target">Hold ${mmss(t.target)}</p>
+          ${art(t)}
+          <ul class="cues" id="cues"></ul>
+          <div class="row">
+            <button class="btn" id="start" type="button">Start the hold</button>
+          </div>`;
+        cues(t);
+        document.getElementById('start')!.onclick = () => {
+          const btn = document.getElementById('start') as HTMLButtonElement;
+          btn.disabled = true;
+          btn.textContent = 'Holding…';
+          countdown(t.target, () => {
+            t.actual += t.target;
+            t.setsDone++;
+            live.si++;
+            save();
+            live.si < t.sets || live.ti < live.tracks.length - 1 ? showRest(t.restSec) : finish();
+          });
+        };
+      } else {
+        root.innerHTML = `
+          ${header(t, live.ti)}
+          ${dots(t)}
+          <p class="target">Target ${t.target} reps${t.perSide ? ' each side' : ''}</p>
+          <div class="counter">
+            <button type="button" id="down" aria-label="One fewer rep">−</button>
+            <output id="count" aria-live="polite">${t.target}</output>
+            <button type="button" id="up" aria-label="One more rep">+</button>
+          </div>
+          ${art(t)}
+          <ul class="cues" id="cues"></ul>
+          <div class="row">
+            <button class="btn" id="done" type="button">Set done</button>
+          </div>`;
+        cues(t);
+
+        let n = t.target;
+        const out = document.getElementById('count')!;
+        const set = (v: number) => { n = Math.max(0, Math.min(999, v)); out.textContent = String(n); };
+        document.getElementById('up')!.onclick = () => set(n + 1);
+        document.getElementById('down')!.onclick = () => set(n - 1);
+        document.getElementById('done')!.onclick = () => {
+          t.actual += n;
+          t.setsDone++;
+          live.si++;
+          save();
+          live.si < t.sets || live.ti < live.tracks.length - 1 ? showRest(t.restSec) : finish();
+        };
+      }
+    }
+
+    // Cues come from the catalog, fetched once and cached by the service worker.
+    async function cues(t: Track) {
+      try {
+        const res = await fetch('/api/catalog.json');
+        const cat = await res.json();
+        const hit = cat.find((e: any) => e.slug === t.slug);
+        const ul = document.getElementById('cues');
+        if (hit && ul) ul.innerHTML = hit.cues.map((c: string) => `<li>${c}</li>`).join('');
+      } catch { /* offline and uncached — the photos still carry the idea */ }
+    }
+
+    showWork();
+  }
+</script>

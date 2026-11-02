@@ -1,0 +1,71 @@
+---
+import Shell from '../layouts/Shell.astro';
+import { leaderboard, type BoardMode } from '../lib/db';
+import { weekKey } from '../lib/scoring';
+
+const user = Astro.locals.user!;
+const db = Astro.locals.runtime?.env?.DB;
+
+const raw = Astro.url.searchParams.get('board');
+const mode: BoardMode = raw === 'all' || raw === 'streak' ? raw : 'week';
+const rows = db ? await leaderboard(db, mode) : [];
+
+const TABS: { key: BoardMode; label: string }[] = [
+  { key: 'week', label: 'This week' },
+  { key: 'all', label: 'All time' },
+  { key: 'streak', label: 'Streaks' },
+];
+
+const heading = mode === 'streak' ? 'Days' : 'Points';
+---
+
+<Shell title="The Billboard">
+  <div class="stack" style="--flow: 1.25rem">
+    <header class="rise">
+      <p class="eyebrow">{mode === 'week' ? `Week of ${weekKey()}` : mode === 'all' ? 'Since day one' : 'Consecutive days'}</p>
+      <h1 class="display chrome-ice">The<br />Billboard</h1>
+    </header>
+
+    <nav class="tabs rise" aria-label="Leaderboard view">
+      {TABS.map((t) => (
+        <a href={`/billboard?board=${t.key}`} aria-current={mode === t.key ? 'true' : undefined}>{t.label}</a>
+      ))}
+    </nav>
+
+    {rows.length === 0 ? (
+      <p class="empty rise">
+        {mode === 'week'
+          ? "Nobody's played this week. Be the opening act."
+          : "Nobody's played yet. Be the opening act."}
+        <br /><br />
+        <a href="/">Build a setlist</a>
+      </p>
+    ) : (
+      <table class="board rise">
+        <thead>
+          <tr>
+            <th scope="col"><span class="sr-only">Position</span></th>
+            <th scope="col">Act</th>
+            <th scope="col" style="text-align:right">{heading}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr data-me={r.user_id === user.id ? '' : null}>
+              <td class="pos">{i + 1}</td>
+              <td>
+                <div class="who">{r.handle}</div>
+                <div class="meta">
+                  {r.rank}
+                  {mode !== 'streak' && r.streak > 0 && <> · {r.streak}&nbsp;day streak</>}
+                  {mode !== 'week' && <> · {r.workouts}&nbsp;{r.workouts === 1 ? 'show' : 'shows'}</>}
+                </div>
+              </td>
+              <td class="pts">{(mode === 'streak' ? r.streak : r.points).toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+</Shell>

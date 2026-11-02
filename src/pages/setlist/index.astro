@@ -1,0 +1,177 @@
+---
+import Shell from '../../layouts/Shell.astro';
+import PhotoFlip from '../../components/PhotoFlip.astro';
+import { INTENSITIES, INTENSITY_META, BUCKET_META, EXERCISES, isHoldRx, type Intensity } from '../../data/exercises';
+import { generateSetlist } from '../../lib/setlist';
+import { recentSlugs } from '../../lib/db';
+import photoIndex from '../../data/photos.generated.json';
+
+const user = Astro.locals.user!;
+const db = Astro.locals.runtime?.env?.DB;
+
+const qp = Astro.url.searchParams;
+const intensity = (INTENSITIES.includes(qp.get('intensity') as Intensity)
+  ? qp.get('intensity')
+  : 'amplified') as Intensity;
+const cooldown = qp.get('cooldown') === '1';
+
+const recent = db ? await recentSlugs(db, user.id) : [];
+const tracks = generateSetlist({ intensity, cooldown, recent });
+
+const fmt = (t: (typeof tracks)[number]) =>
+  t.mode === 'hold'
+    ? `${t.sets} × ${t.target >= 60 ? `${Math.floor(t.target / 60)}:${String(t.target % 60).padStart(2, '0')}` : `${t.target}s`}`
+    : `${t.sets} × ${t.target}`;
+
+const totalMin = Math.round(
+  tracks.reduce((n, t) => n + t.sets * ((t.mode === 'hold' ? t.target : t.target * 3) + t.restSec), 0) / 60,
+);
+
+// Trimmed catalog so swapping a track never needs the network.
+const pool = EXERCISES.map((e) => {
+  const rx = e.rx[intensity];
+  return {
+    slug: e.slug, stage: e.stage, real: e.real, band: e.band,
+    bucket: e.bucket, mode: e.mode, perSide: !!e.perSide,
+    sets: rx.sets, target: isHoldRx(rx) ? rx.seconds : rx.reps, restSec: rx.restSec,
+    photos: ((photoIndex as Record<string, { stem: string }[]>)[e.slug] ?? []).map((p) => p.stem),
+  };
+});
+
+const payload = {
+  intensity,
+  pool,
+  recent,
+  tracks: tracks.map((t) => ({
+    slug: t.slug, stage: t.exercise.stage, real: t.exercise.real, band: t.exercise.band,
+    bucket: t.bucket, mode: t.mode, perSide: !!t.exercise.perSide,
+    sets: t.sets, target: t.target, restSec: t.restSec, photos: t.photos,
+  })),
+};
+---
+
+<Shell title="Setlist">
+  <div class="stack" style="--flow: 1.5rem">
+    <header class="rise">
+      <p class="eyebrow">{INTENSITY_META[intensity].label} · {totalMin} min</p>
+      <h1 class="display chrome">Tonight's<br />Setlist</h1>
+    </header>
+
+    <ol class="setlist" id="setlist" style="margin-top:.5rem">
+      {tracks.map((t, i) => (
+        <li class="track rise" data-track={i}>
+          <span class="track-no" aria-hidden="true">{i + 1}</span>
+          <div>
+            <h2 class="track-stage">{t.exercise.stage}</h2>
+            <p class="track-sub">
+              <span class="real-name">{t.exercise.real}</span>
+              <span class="bucket-tag" data-bucket={t.bucket}>{BUCKET_META[t.bucket].label}</span>
+            </p>
+          </div>
+          <div class="track-rx">
+            <span data-rx>{fmt(t)}{t.exercise.perSide ? ' / side' : ''}</span>
+            <button class="btn-ghost" type="button" data-swap={i}>Swap</button>
+          </div>
+          <div class="track-art">
+            <PhotoFlip slug={t.slug} alt={`${t.exercise.real} demonstration`} width={480} />
+          </div>
+        </li>
+      ))}
+    </ol>
+
+    <button class="btn" id="go" type="button">▶ Take the stage</button>
+    <p class="meta" style="text-align:center">
+      <a href="/">Different intensity</a>
+    </p>
+  </div>
+
+  <script type="application/json" id="payload" set:html={JSON.stringify(payload)} />
+</Shell>
+
+<style>
+  .track-art { grid-column: 2; margin-top: .85rem; max-width: 22rem; }
+  .setlist { list-style: none; margin: 0; padding: 0; }
+</style>
+
+<script>
+  type T = {
+    slug: string; stage: string; real: string; band: string; bucket: string;
+    mode: 'reps' | 'hold'; perSide: boolean; sets: number; target: number;
+    restSec: number; photos: string[];
+  };
+
+  const data = JSON.parse(document.getElementById('payload')!.textContent!) as {
+    intensity: string; pool: T[]; recent: string[]; tracks: T[];
+  };
+
+  const clock = (s: number) =>
+    s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
+
+  const label = (t: T) =>
+    `${t.sets} × ${t.mode === 'hold' ? clock(t.target) : t.target}${t.perSide ? ' / side' : ''}`;
+
+  function render(i: number) {
+    const t = data.tracks[i]!;
+    const li = document.querySelector<HTMLElement>(`[data-track="${i}"]`)!;
+    li.querySelector('.track-stage')!.textContent = t.stage;
+    li.querySelector('.real-name')!.textContent = t.real;
+    li.querySelector('[data-rx]')!.textContent = label(t);
+
+    const art = li.querySelector('.track-art')!;
+    art.innerHTML = t.photos.length
+      ? `<figure class="photo-frame"><div class="photo-stack">${t.photos
+          .slice(0, 8)
+          .map((p, n) => `<img src="/ex/${p}-480.webp" alt="${n ? '' : t.real + ' demonstration'}" ${n ? 'aria-hidden="true"' : 'data-on'} loading="lazy" decoding="async">`)
+          .join('')}</div></figure>`
+      : `<div class="photo-frame is-empty"><p class="meta">No photo yet</p></div>`;
+    flip(art.querySelector('.photo-stack'));
+  }
+
+  // Cycle a freshly swapped-in photo stack.
+  function flip(stack: Element | null) {
+    if (!stack || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const imgs = [...stack.querySelectorAll<HTMLImageElement>('img')];
+    if (imgs.length < 2) return;
+    let i = 0;
+    setInterval(() => {
+      imgs[i]!.removeAttribute('data-on');
+      i = (i + 1) % imgs.length;
+      imgs[i]!.setAttribute('data-on', '');
+    }, 600);
+  }
+
+  // Re-roll within the same bucket so the push/core/lower balance survives.
+  document.getElementById('setlist')!.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-swap]');
+    if (!btn) return;
+    const i = Number(btn.dataset.swap);
+    const current = data.tracks[i]!;
+    const onList = new Set(data.tracks.map((t) => t.slug));
+
+    const options = data.pool.filter(
+      (p) => p.bucket === current.bucket && !onList.has(p.slug) && p.photos.length > 0,
+    );
+    if (!options.length) return;
+
+    // Prefer something not done recently.
+    const fresh = options.filter((p) => !data.recent.slice(0, 6).includes(p.slug));
+    const from = fresh.length ? fresh : options;
+    data.tracks[i] = from[Math.floor(Math.random() * from.length)]!;
+    render(i);
+  });
+
+  document.getElementById('go')!.addEventListener('click', () => {
+    sessionStorage.setItem(
+      'afc:live',
+      JSON.stringify({
+        id: crypto.randomUUID(),
+        intensity: data.intensity,
+        startedAt: new Date().toISOString(),
+        ti: 0,
+        si: 0,
+        tracks: data.tracks.map((t) => ({ ...t, actual: 0, setsDone: 0 })),
+      }),
+    );
+    location.href = '/setlist/run';
+  });
+</script>

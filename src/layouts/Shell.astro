@@ -1,0 +1,100 @@
+---
+import '../styles/theme.css';
+
+interface Props {
+  title?: string;
+  /** Hide the top bar on the splash screen. */
+  bare?: boolean;
+}
+
+const { title, bare = false } = Astro.props;
+const user = Astro.locals.user;
+const path = Astro.url.pathname;
+const fullTitle = title ? `${title} · Appetite for Contraction` : 'Appetite for Contraction';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{fullTitle}</title>
+    <meta name="description" content="Three exercises, one setlist, and a leaderboard. Bodyweight training with a 1989 problem." />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#07030f" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Contraction" />
+  </head>
+
+  <body>
+    {!bare && (
+      <header class="shell topbar">
+        <a href="/" class="logo" aria-label="Appetite for Contraction — home">AFC</a>
+        <nav aria-label="Main">
+          <a href="/billboard" aria-current={path.startsWith('/billboard') ? 'page' : undefined}>Billboard</a>
+          <a href="/exercises" aria-current={path.startsWith('/exercises') ? 'page' : undefined}>Catalog</a>
+          {user && <a href="/me" aria-current={path.startsWith('/me') ? 'page' : undefined}>{user.handle}</a>}
+        </nav>
+      </header>
+    )}
+
+    <main class="shell" id="main">
+      <slot />
+    </main>
+
+    <footer class="shell foot">
+      <p class="meta">Appetite for Contraction · no refunds · no encores</p>
+    </footer>
+
+    <script is:inline>
+      if ('serviceWorker' in navigator) {
+        addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+      }
+    </script>
+
+    <script>
+      import { flushQueue } from '../lib/offline';
+      flushQueue();
+      addEventListener('online', () => flushQueue());
+    </script>
+  </body>
+</html>
+
+<style>
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 1rem .75rem;
+    margin-bottom: 1.25rem;
+    border-bottom: var(--rule);
+  }
+  .topbar nav {
+    display: flex;
+    gap: 1rem;
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .topbar nav a { color: var(--fg-mute); text-decoration: none; }
+  .topbar nav a:hover { color: var(--ice); }
+  .topbar nav a[aria-current] { color: var(--hot); text-shadow: var(--glow-hot); }
+
+  main { padding-bottom: 3rem; }
+
+  .foot {
+    padding-block: 2rem 2.5rem;
+    border-top: var(--rule);
+    text-align: center;
+    opacity: .5;
+  }
+</style>

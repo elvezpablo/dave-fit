@@ -1,0 +1,559 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   APPETITE FOR CONTRACTION — design tokens
+
+   Reference is airbrush, not synthwave: Trapper Keeper and custom-van art.
+   Soft candy gradient blends, hard chrome with a specular band, acid
+   highlights over near-black violet. Type is condensed throughout because
+   tour posters are condensed — that's how you fit 40 city names on a sheet.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Monoton&family=Share+Tech+Mono&display=swap');
+
+:root {
+  /* ── ground ─────────────────────────────────────────────────────────── */
+  --ink:        #07030f;
+  --ink-2:      #130922;
+  --ink-3:      #1f0f38;
+  --hairline:   #3a2259;
+
+  /* ── airbrush candy ─────────────────────────────────────────────────── */
+  --hot:        #ff1e7a;
+  --hot-dim:    #a3104c;
+  --ice:        #22e7ff;
+  --ice-dim:    #0f8ba3;
+  --acid:       #d8ff2e;
+  --flesh:      #ffb347;
+  --violet:     #9d4edd;
+
+  /* ── text ───────────────────────────────────────────────────────────── */
+  --fg:         #fff4fb;
+  --fg-mute:    #b89bd4;
+  --fg-faint:   #6f5a92;
+
+  /* ── type ───────────────────────────────────────────────────────────── */
+  --font-display: 'Anton', 'Haettenschweiler', 'Arial Narrow', sans-serif;
+  --font-logo:    'Monoton', 'Anton', cursive;
+  --font-body:    'Barlow Condensed', 'Roboto Condensed', system-ui, sans-serif;
+  --font-mono:    'Share Tech Mono', ui-monospace, 'SF Mono', monospace;
+
+  --step--1: clamp(.78rem, .74rem + .2vw, .88rem);
+  --step-0:  clamp(1rem, .95rem + .25vw, 1.12rem);
+  --step-1:  clamp(1.3rem, 1.15rem + .7vw, 1.7rem);
+  --step-2:  clamp(1.8rem, 1.4rem + 1.9vw, 2.9rem);
+  --step-3:  clamp(2.6rem, 1.8rem + 3.6vw, 4.4rem);
+  --step-4:  clamp(3.4rem, 2rem + 6vw, 6.5rem);
+
+  /* ── space & shape ──────────────────────────────────────────────────── */
+  --gut: clamp(1rem, .6rem + 2vw, 1.75rem);
+  --rule: 2px solid var(--hairline);
+  --shell: 44rem;
+
+  --glow-hot: 0 0 12px rgba(255, 30, 122, .55), 0 0 36px rgba(255, 30, 122, .25);
+  --glow-ice: 0 0 12px rgba(34, 231, 255, .55), 0 0 36px rgba(34, 231, 255, .22);
+}
+
+/* ═══ reset ════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  min-height: 100dvh;
+  background: var(--ink);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* The ambient airbrush wash. Fixed so it doesn't scroll — it's the backdrop
+   the whole app is painted on, like the canvas of a van. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(ellipse 80% 55% at 12% -5%,  rgba(255, 30, 122, .30), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 92% 8%,   rgba(157, 78, 221, .28), transparent 62%),
+    radial-gradient(ellipse 90% 45% at 50% 104%, rgba(34, 231, 255, .20), transparent 68%),
+    var(--ink);
+}
+
+/* Horizon grid — the floor of the stage. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: auto 0 0 0;
+  height: 34vh;
+  z-index: -1;
+  pointer-events: none;
+  opacity: .25;
+  background-image:
+    linear-gradient(to right,  rgba(34, 231, 255, .5) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34, 231, 255, .5) 1px, transparent 1px);
+  background-size: 2.5rem 2.5rem;
+  transform: perspective(22rem) rotateX(68deg);
+  transform-origin: bottom center;
+  mask-image: linear-gradient(to top, #000 10%, transparent 85%);
+}
+
+img, svg { display: block; max-width: 100%; }
+button, input, select { font: inherit; color: inherit; }
+a { color: var(--ice); text-decoration-thickness: 1px; text-underline-offset: .18em; }
+
+:focus-visible {
+  outline: 3px solid var(--acid);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ═══ chrome ═══════════════════════════════════════════════════════════
+   The hard stop at 49%/50% is the whole trick. A soft gradient reads as a
+   gradient; the abrupt specular band is what makes the eye call it metal. */
+.chrome {
+  background-image: linear-gradient(
+    177deg,
+    #ffffff 0%,  #e4f2ff 14%, #9db4d4 33%,
+    #41567a 48%, #ffffff 50%, #ffd9ec 56%,
+    #ff7ab8 70%, #b83a73 86%, #ffe9f4 100%
+  );
+  background-size: 100% 1em;
+  background-size: 100% 1lh;
+  background-repeat: repeat-y;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 #2a0f3f) drop-shadow(0 0 18px rgba(255, 30, 122, .45));
+}
+
+.chrome-ice {
+  background-image: linear-gradient(
+    177deg,
+    #ffffff 0%,  #dff9ff 14%, #86cfe4 33%,
+    #2d6d85 48%, #ffffff 50%, #d6f8ff 56%,
+    #22e7ff 70%, #107f96 86%, #e6fcff 100%
+  );
+  background-size: 100% 1em;
+  background-size: 100% 1lh;
+  background-repeat: repeat-y;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 #06252e) drop-shadow(0 0 18px rgba(34, 231, 255, .45));
+}
+
+/* ═══ type roles ═══════════════════════════════════════════════════════ */
+.logo {
+  text-decoration: none;
+  font-family: var(--font-logo);
+  font-size: var(--step-1);
+  letter-spacing: .02em;
+  line-height: 1;
+  color: var(--hot);
+  text-shadow: var(--glow-hot);
+}
+
+.display {
+  font-family: var(--font-display);
+  font-size: var(--step-3);
+  line-height: .88;
+  padding-bottom: .08em;
+  letter-spacing: .005em;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: .34em;
+  text-transform: uppercase;
+  color: var(--ice);
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+}
+
+.real-name {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--fg-mute);
+  letter-spacing: .01em;
+}
+
+/* ═══ layout ═══════════════════════════════════════════════════════════ */
+.shell {
+  width: min(100% - (var(--gut) * 2), var(--shell));
+  margin-inline: auto;
+}
+
+.stack > * + * { margin-block-start: var(--flow, 1rem); }
+
+/* ═══ bolt divider — the one piece of pure ornament that survived ══════ */
+.bolt {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  color: var(--hot);
+}
+.bolt svg { width: 1.1rem; height: 1.6rem; filter: drop-shadow(0 0 8px currentColor); }
+.bolt::before, .bolt::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--hot-dim), var(--hot), var(--hot-dim), transparent);
+}
+
+/* ═══ buttons ══════════════════════════════════════════════════════════ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  width: 100%;
+  min-height: 3.5rem;
+  padding: .8rem 1.5rem;
+  border: 2px solid var(--hot);
+  border-radius: 3px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.22), transparent 42%, rgba(0,0,0,.35)),
+    linear-gradient(180deg, var(--hot), var(--hot-dim));
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  text-shadow: 0 2px 0 rgba(0,0,0,.45);
+  box-shadow: var(--glow-hot), inset 0 1px 0 rgba(255,255,255,.5);
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .2s ease, filter .2s ease;
+}
+.btn:hover { filter: brightness(1.12); transform: translateY(-2px); }
+.btn:active { transform: translateY(1px); }
+.btn[disabled] { opacity: .4; cursor: not-allowed; filter: grayscale(.6); transform: none; }
+
+.btn-ice {
+  border-color: var(--ice);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.22), transparent 42%, rgba(0,0,0,.35)),
+    linear-gradient(180deg, var(--ice), var(--ice-dim));
+  color: #04202a;
+  text-shadow: 0 1px 0 rgba(255,255,255,.35);
+  box-shadow: var(--glow-ice), inset 0 1px 0 rgba(255,255,255,.6);
+}
+
+.btn-ghost {
+  width: auto;
+  min-height: 2.5rem;
+  padding: .35rem .9rem;
+  border: 2px solid var(--hairline);
+  background: rgba(19, 9, 34, .8);
+  color: var(--fg-mute);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: .14em;
+  box-shadow: none;
+  text-shadow: none;
+}
+.btn-ghost:hover { border-color: var(--ice); color: var(--ice); filter: none; }
+
+/* ═══ panels ═══════════════════════════════════════════════════════════ */
+.panel {
+  border: var(--rule);
+  border-radius: 4px;
+  background: linear-gradient(170deg, rgba(31,15,56,.92), rgba(7,3,15,.92));
+  padding: var(--gut);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.04), 0 18px 40px -22px #000;
+}
+
+/* ═══ the setlist ══════════════════════════════════════════════════════
+   The core object. A real setlist is a numbered running order in huge
+   condensed caps — the numbering is information, not decoration: you play
+   track 1, then 2, then 3. */
+.setlist { border-top: var(--rule); margin-top: .35rem; }
+
+.track {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.75rem 1fr;
+  gap: 0 .9rem;
+  padding: 1.1rem 0;
+  border-bottom: var(--rule);
+}
+
+.track-no {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  line-height: .85;
+  color: transparent;
+  -webkit-text-stroke: 2px var(--hot);
+  text-stroke: 2px var(--hot);
+}
+
+.track-stage {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  line-height: .92;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.track-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .25rem .6rem;
+  margin-top: .15rem;
+}
+
+.track-rx {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .6rem;
+  margin-top: .6rem;
+  font-family: var(--font-mono);
+  font-size: var(--step-0);
+  letter-spacing: .08em;
+  color: var(--acid);
+}
+
+/* Gear-case stencil. Says *why* this exercise is on the list. */
+.bucket-tag {
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  padding: .18rem .45rem;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  color: var(--ice);
+  opacity: .8;
+}
+.bucket-tag[data-bucket='core']     { color: var(--hot); }
+.bucket-tag[data-bucket='lower']    { color: var(--acid); }
+.bucket-tag[data-bucket='mobility'] { color: var(--flesh); }
+
+/* ═══ photos ═══════════════════════════════════════════════════════════
+   The risk: these are bad iPhone photos of three guys in jeans in a garage.
+   Rather than hide that, print them — duotone plus a halftone dot screen, so
+   they read as a cheap 1989 tour program instead of as bad photos. */
+.photo-frame {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid var(--hot);
+  border-radius: 3px;
+  background: #0d0518;
+  box-shadow: var(--glow-hot);
+  /* The frame is always 4:3 so cards stay a consistent shape, but the image
+     is contained rather than cropped — 97 of the 148 photos are native 4:3
+     and fill it exactly; the 51 portrait ones letterbox rather than lose a
+     head or a foot. */
+  aspect-ratio: 4 / 3;
+}
+
+.photo-frame img {
+  width: 100%;
+  height: 100%;
+  /* contain, not cover: you have to be able to see the whole movement. */
+  object-fit: contain;
+  filter: grayscale(.55) contrast(1.1) brightness(1.02) saturate(1.1);
+}
+
+/* Duotone, kept light. The print treatment is the joke; the exercise is the
+   job, and at full strength the tint buried the form. */
+.photo-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(145deg, var(--ice), var(--violet) 48%, var(--hot));
+  mix-blend-mode: color;
+  opacity: .34;
+}
+
+/* halftone screen */
+.photo-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image: radial-gradient(circle at center, #000 .9px, transparent 1.1px);
+  background-size: 3px 3px;
+  mix-blend-mode: overlay;
+  opacity: .26;
+}
+
+.photo-frame.is-plain::before,
+.photo-frame.is-plain::after { opacity: 0; }
+.photo-frame.is-plain img { filter: none; }
+
+.photo-stack { display: grid; }
+.photo-stack > * { grid-area: 1 / 1; }
+.photo-stack img { opacity: 0; transition: opacity .18s linear; }
+.photo-stack img[data-on] { opacity: 1; }
+
+.photo-note {
+  position: absolute;
+  z-index: 3;
+  inset: auto .4rem .4rem auto;
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  padding: .15rem .4rem;
+  background: rgba(7,3,15,.82);
+  border: 1px solid var(--hairline);
+  color: var(--fg-faint);
+}
+
+/* ═══ timer ════════════════════════════════════════════════════════════
+   Where the motion budget is spent. The ring drains and the colour walks
+   from ice to hot to acid as the clock runs out. */
+.clock { display: grid; place-items: center; grid-template-areas: 'c'; }
+.clock > * { grid-area: c; }
+
+.clock-ring { transform: rotate(-90deg); width: min(72vw, 17rem); height: min(72vw, 17rem); }
+.clock-ring circle { fill: none; stroke-width: 10; stroke-linecap: round; }
+.clock-track { stroke: var(--ink-3); }
+.clock-fill {
+  stroke: var(--ice);
+  filter: drop-shadow(0 0 10px currentColor);
+  transition: stroke-dashoffset .95s linear, stroke .6s ease;
+}
+.clock[data-phase='mid']  .clock-fill { stroke: var(--hot); }
+.clock[data-phase='late'] .clock-fill { stroke: var(--acid); }
+
+.clock-time {
+  font-family: var(--font-mono);
+  font-size: var(--step-4);
+  line-height: 1;
+  letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: var(--glow-ice);
+}
+.clock[data-phase='mid']  .clock-time { text-shadow: var(--glow-hot); }
+.clock[data-phase='late'] .clock-time { text-shadow: 0 0 14px var(--acid); }
+
+.rep-dots { display: flex; justify-content: center; gap: .4rem; }
+.rep-dot {
+  width: .85rem; height: .85rem;
+  border: 2px solid var(--hairline);
+  border-radius: 50%;
+  transition: background .2s, border-color .2s, box-shadow .2s;
+}
+.rep-dot[data-done] { background: var(--acid); border-color: var(--acid); box-shadow: 0 0 10px var(--acid); }
+
+/* ═══ billboard ════════════════════════════════════════════════════════ */
+.board { width: 100%; border-collapse: collapse; font-family: var(--font-mono); }
+.board th {
+  font-size: .68rem;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--fg-faint);
+  padding: .5rem .4rem;
+  border-bottom: var(--rule);
+  font-weight: 400;
+}
+.board td { padding: .7rem .4rem; border-bottom: 1px solid var(--ink-3); vertical-align: baseline; }
+.board tr[data-me] td { background: rgba(255, 30, 122, .12); }
+.board .pos { font-family: var(--font-display); font-size: var(--step-1); color: var(--fg-faint); width: 2.5rem; }
+.board tr:nth-child(1) .pos { color: var(--acid); }
+.board tr:nth-child(2) .pos { color: var(--ice); }
+.board tr:nth-child(3) .pos { color: var(--hot); }
+.board .who { font-family: var(--font-body); font-size: var(--step-1); font-weight: 600; letter-spacing: .01em; }
+.board .pts { text-align: right; color: var(--acid); font-size: var(--step-0); }
+
+.tabs { display: flex; gap: .4rem; }
+.tabs a {
+  flex: 1;
+  text-align: center;
+  padding: .55rem .4rem;
+  border: 2px solid var(--hairline);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+  text-decoration: none;
+}
+.tabs a[aria-current] { border-color: var(--hot); color: var(--fg); box-shadow: var(--glow-hot); }
+.tabs a { text-decoration: none; }
+
+/* ═══ forms ════════════════════════════════════════════════════════════ */
+.field { display: block; }
+.field > span {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--ice);
+  margin-bottom: .35rem;
+}
+.field input {
+  width: 100%;
+  min-height: 3rem;
+  padding: .6rem .8rem;
+  border: 2px solid var(--hairline);
+  border-radius: 3px;
+  background: rgba(7,3,15,.75);
+  color: var(--fg);
+  font-size: var(--step-0);
+}
+.field input:focus { border-color: var(--ice); }
+
+.notice {
+  border: 2px solid var(--hot);
+  border-left-width: 6px;
+  border-radius: 3px;
+  padding: .7rem .9rem;
+  background: rgba(163, 16, 76, .22);
+  font-size: var(--step-0);
+}
+.notice-ok { border-color: var(--acid); background: rgba(216, 255, 46, .12); }
+
+/* ═══ misc ═════════════════════════════════════════════════════════════ */
+.empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--fg-mute);
+  border: 2px dashed var(--hairline);
+  border-radius: 4px;
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Staggered entrance — a setlist being written down, three lines only. */
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise .5s cubic-bezier(.2, .7, .3, 1) backwards; }
+.rise:nth-child(1) { animation-delay: .04s; }
+.rise:nth-child(2) { animation-delay: .12s; }
+.rise:nth-child(3) { animation-delay: .20s; }
+.rise:nth-child(4) { animation-delay: .28s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

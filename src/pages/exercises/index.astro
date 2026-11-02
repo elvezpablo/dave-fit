@@ -1,0 +1,56 @@
+---
+import Shell from '../../layouts/Shell.astro';
+import PhotoFlip from '../../components/PhotoFlip.astro';
+import { EXERCISES, BUCKET_META, type Bucket } from '../../data/exercises';
+
+const ORDER: Bucket[] = ['push', 'core', 'lower', 'mobility'];
+---
+
+<Shell title="Catalog">
+  <div class="stack" style="--flow: 2rem">
+    <header>
+      <p class="eyebrow">{EXERCISES.length} tracks</p>
+      <h1 class="display chrome">The<br />Back Catalog</h1>
+    </header>
+
+    {ORDER.map((bucket) => (
+      <section class="stack" style="--flow: .9rem">
+        <h2 class="bolt">
+          <span class="eyebrow" style="color: var(--hot)">{BUCKET_META[bucket].label}</span>
+        </h2>
+        <ul class="grid">
+          {EXERCISES.filter((e) => e.bucket === bucket).map((e) => (
+            <li>
+              <a href={`/exercises/${e.slug}`}>
+                <PhotoFlip slug={e.slug} alt={e.real} width={480} animate={false} />
+                <h3 class="name">{e.stage}</h3>
+                <p class="real-name">{e.real}</p>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))}
+  </div>
+</Shell>
+
+<style>
+  .grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: 1rem;
+  }
+  .grid a { display: block; text-decoration: none; color: inherit; }
+  .grid a:hover .name { color: var(--ice); }
+  .name {
+    font-family: var(--font-display);
+    font-size: var(--step-0);
+    text-transform: uppercase;
+    line-height: 1.05;
+    margin-top: .5rem;
+  }
+  .grid .real-name { font-size: var(--step--1); }
+</style>
