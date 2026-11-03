@@ -36,9 +36,26 @@ import Shell from '../../layouts/Shell.astro';
   }
   #stage .row { display: flex; gap: .6rem; }
   #stage .row .btn { flex: 1; }
-  #stage .art { max-width: 20rem; margin-inline: auto; }
+  #stage .ghosts { margin-top: -.6rem; }
+  #stage .ghosts .btn-ghost { flex: 1; width: auto; }
+  #stage .art { max-width: 20rem; margin-inline: auto; cursor: pointer; }
   #stage .phase-note { text-align: center; }
   #stage .rep-dots { margin-block: .25rem; }
+
+  /* The set clock in reps mode is a passenger, not the headline — same ring,
+     shrunk down so it doesn't shove the photos off the fold. */
+  #stage .clock.is-mini .clock-ring { width: 5.5rem; height: 5.5rem; }
+  #stage .clock.is-mini .clock-ring circle { stroke-width: 9; }
+  #stage .clock.is-mini .clock-time { font-size: var(--step-1); }
+
+  /* A running clock breathes; a paused one goes flat and says so. */
+  #stage .clock[data-state='run'] .clock-time { animation: tick-pulse 1s steps(1) infinite; }
+  #stage .clock[data-state='hold'] { opacity: .55; }
+  #stage .clock[data-state='hold'] .clock-fill { filter: none; }
+  @keyframes tick-pulse { 0%, 60% { opacity: 1; } 61%, 100% { opacity: .82; } }
+  @media (prefers-reduced-motion: reduce) {
+    #stage .clock[data-state='run'] .clock-time { animation: none; }
+  }
 </style>
 
 <script>
@@ -63,14 +80,16 @@ import Shell from '../../layouts/Shell.astro';
   }
 
   function run(live: Live) {
-    let timer: number | undefined;
     const save = () => sessionStorage.setItem(KEY, JSON.stringify(live));
-    const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s % 60)).padStart(2, '0')}`;
+    const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, Math.floor(s) % 60)).padStart(2, '0')}`;
 
     // Short tone at the end of a countdown. Cheap, no asset to load.
+    // One context for the whole session — a new one per beep leaks on iOS.
+    let ac: AudioContext | undefined;
     function beep(freq = 660, ms = 160) {
       try {
-        const ac = new AudioContext();
+        ac ??= new AudioContext();
+        if (ac.state === 'suspended') void ac.resume();
         const osc = ac.createOscillator();
         const gain = ac.createGain();
         osc.frequency.value = freq;
@@ -83,41 +102,202 @@ import Shell from '../../layouts/Shell.astro';
       } catch { /* no audio, no problem */ }
     }
 
-    function stop() { clearInterval(timer); timer = undefined; }
+    // ── photos ───────────────────────────────────────────────────────────
+    // The frames in a stack are the same movement from different angles, so
+    // cycling them reads as the exercise rather than a still. Runs on every
+    // screen that shows art, and goes still whenever the clock does.
+    const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    /** Countdown that paints a draining ring and calls back at zero. */
-    function countdown(total: number, onDone: () => void) {
-      let left = total;
-      const ring = root.querySelector<SVGCircleElement>('.clock-fill');
-      const time = root.querySelector<HTMLElement>('.clock-time');
-      const wrap = root.querySelector<HTMLElement>('.clock');
-      const CIRC = 2 * Math.PI * 70;
+    function mountFlip() {
+      const imgs = [...root.querySelectorAll<HTMLImageElement>('.photo-stack img')];
+      let i = 0;
+      let spin: number | undefined;
 
-      const paint = () => {
-        if (time) time.textContent = mmss(left);
-        if (ring) ring.style.strokeDashoffset = String(CIRC * (1 - left / total));
-        const frac = left / total;
-        wrap?.setAttribute('data-phase', frac > 0.55 ? 'early' : frac > 0.25 ? 'mid' : 'late');
+      const step = () => {
+        imgs[i]?.removeAttribute('data-on');
+        i = (i + 1) % imgs.length;
+        imgs[i]?.setAttribute('data-on', '');
       };
-      paint();
+      const start = () => {
+        if (REDUCED || imgs.length < 2) return;
+        spin ??= setInterval(step, 900) as unknown as number;
+      };
+      const stop = () => { clearInterval(spin); spin = undefined; };
 
-      stop();
-      timer = setInterval(() => {
-        left--;
-        paint();
-        if (left <= 3 && left > 0) beep(520, 90);
-        if (left <= 0) { stop(); beep(880, 320); onDone(); }
-      }, 1000) as unknown as number;
+      // Tap the photo to freeze a frame you want to study, tap again to resume.
+      root.querySelector('.art')?.addEventListener('click', () => (spin ? stop() : start()));
+      start();
+      return { start, stop };
     }
 
-    const ring = (sec: number) => `
-      <div class="clock" data-phase="early">
+    // ── the clock ────────────────────────────────────────────────────────
+    type Clock = {
+      elapsed: () => number;
+      started: () => boolean;
+      stop: () => void;
+      toggle: () => void;
+      reset: () => void;
+    };
+    /** The clock on screen right now, so keys and screen changes can reach it. */
+    let active: Clock | undefined;
+    let flip: { start: () => void; stop: () => void } | undefined;
+
+    /** Tear down whatever is running before a screen is replaced. */
+    function teardown() {
+      active?.stop();
+      active = undefined;
+      flip?.stop();
+      flip = undefined;
+    }
+
+    const ring = (sec: number, mini = false) => `
+      <div class="clock${mini ? ' is-mini' : ''}" data-phase="early" data-state="idle">
         <svg class="clock-ring" viewBox="0 0 160 160" aria-hidden="true">
           <circle class="clock-track" cx="80" cy="80" r="70"></circle>
           <circle class="clock-fill" cx="80" cy="80" r="70"
                   stroke-dasharray="${2 * Math.PI * 70}" stroke-dashoffset="0"></circle>
         </svg>
         <output class="clock-time" aria-live="off">${mmss(sec)}</output>
+      </div>`;
+
+    /**
+     * Wires the `.clock` just rendered into `root` to `#t-main` (start, then
+     * pause/resume) and `#t-reset`. Time is measured from the wall clock, not
+     * counted in ticks, so a locked phone or a backgrounded tab comes back
+     * showing the truth.
+     *
+     * `down` counts a hold to zero and calls `onDone`; `up` is an open
+     * stopwatch whose ring sweeps once a minute.
+     */
+    function mountClock(opts: {
+      total: number;
+      mode: 'down' | 'up';
+      startLabel: string;
+      autostart?: boolean;
+      onState?: (s: { running: boolean; started: boolean }) => void;
+      onDone?: () => void;
+    }): Clock {
+      const wrap = root.querySelector<HTMLElement>('.clock');
+      const fill = root.querySelector<SVGCircleElement>('.clock-fill');
+      const time = root.querySelector<HTMLElement>('.clock-time');
+      const main = root.querySelector<HTMLButtonElement>('#t-main');
+      const resetBtn = root.querySelector<HTMLButtonElement>('#t-reset');
+      const CIRC = 2 * Math.PI * 70;
+
+      // Painted every 100ms, so the CSS transition would only ever lag it.
+      if (fill) fill.style.transition = 'stroke .6s ease';
+
+      let banked = 0;            // ms from runs before the current one
+      let since: number | null = null; // wall-clock start of the current run
+      let ticker: number | undefined;
+      let started = false;
+      let finished = false;
+      let lastBeep = -1;
+
+      const ms = () => banked + (since === null ? 0 : Date.now() - since);
+      const running = () => since !== null;
+
+      function paint() {
+        const secs = ms() / 1000;
+        const shown = opts.mode === 'down' ? Math.max(0, opts.total - secs) : secs;
+        if (time) time.textContent = mmss(opts.mode === 'down' ? Math.ceil(shown) : Math.floor(shown));
+
+        // Counting down, the ring drains and cools off as time runs out;
+        // counting up, it sweeps and warms once a minute.
+        const frac = opts.mode === 'down'
+          ? (opts.total > 0 ? shown / opts.total : 0)
+          : (shown % 60) / 60;
+        if (fill) fill.style.strokeDashoffset = String(CIRC * (1 - frac));
+        wrap?.setAttribute(
+          'data-phase',
+          opts.mode === 'down'
+            ? (frac > 0.55 ? 'early' : frac > 0.25 ? 'mid' : 'late')
+            : (frac < 0.45 ? 'early' : frac < 0.8 ? 'mid' : 'late'),
+        );
+        wrap?.setAttribute('data-state', running() ? 'run' : started ? 'hold' : 'idle');
+      }
+
+      function paintControls() {
+        if (main && !finished) main.textContent = running() ? 'Pause' : started ? 'Resume' : opts.startLabel;
+        if (resetBtn) resetBtn.disabled = !started;
+        opts.onState?.({ running: running(), started });
+      }
+
+      function frame() {
+        paint();
+        if (opts.mode !== 'down') return;
+        const left = Math.ceil(opts.total - ms() / 1000);
+        if (left <= 3 && left > 0 && left !== lastBeep) { lastBeep = left; beep(520, 90); }
+        if (ms() / 1000 >= opts.total) {
+          finished = true;
+          stop();
+          paint();
+          beep(880, 320);
+          opts.onDone?.();
+        }
+      }
+
+      function start() {
+        if (finished || running()) return;
+        since = Date.now();
+        started = true;
+        ticker ??= setInterval(frame, 100) as unknown as number;
+        flip?.start();
+        paint();
+        paintControls();
+      }
+
+      function pause() {
+        if (!running()) return;
+        banked = ms();
+        since = null;
+        clearInterval(ticker);
+        ticker = undefined;
+        flip?.stop();
+        paint();
+        paintControls();
+      }
+
+      function stop() { clearInterval(ticker); ticker = undefined; since = null; }
+
+      function reset() {
+        stop();
+        banked = 0;
+        started = false;
+        lastBeep = -1;
+        flip?.start();
+        paint();
+        paintControls();
+      }
+
+      main?.addEventListener('click', () => (running() ? pause() : start()));
+      resetBtn?.addEventListener('click', reset);
+
+      paint();
+      paintControls();
+      if (opts.autostart) start();
+
+      return { elapsed: () => ms() / 1000, started: () => started, stop, reset, toggle: () => (running() ? pause() : start()) };
+    }
+
+    // Desk-friendly: space works the main button, R resets — but only when
+    // nothing is focused, so tapping a real button still does its own job.
+    document.addEventListener('keydown', (e) => {
+      if (!active || e.target !== document.body || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === ' ') { e.preventDefault(); active.toggle(); }
+      else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); active.reset(); }
+    });
+
+    /**
+     * The control bar every screen ends with: one headline action on its own
+     * row, the clock's smaller controls under it. `#t-main` and `#t-reset`
+     * are what `mountClock` binds to, wherever in the bar they sit.
+     */
+    const controls = (main: string, ghosts = '') => `
+      <div class="row">${main}</div>
+      <div class="row ghosts">
+        ${ghosts}
+        <button class="btn btn-ghost" id="t-reset" type="button" disabled>Reset</button>
       </div>`;
 
     const art = (t: Track) =>
@@ -145,7 +325,7 @@ import Shell from '../../layouts/Shell.astro';
       </div>`;
 
     function finish() {
-      stop();
+      teardown();
       sessionStorage.setItem('afc:done', JSON.stringify(live));
       sessionStorage.removeItem(KEY);
       location.href = '/setlist/done';
@@ -158,21 +338,37 @@ import Shell from '../../layouts/Shell.astro';
       finish();
     }
 
+    /** Bank a finished set and move on — the one exit every screen shares. */
+    function bank(t: Track, amount: number) {
+      t.actual += Math.max(0, Math.round(amount));
+      t.setsDone++;
+      live.si++;
+      save();
+      live.si < t.sets || live.ti < live.tracks.length - 1 ? showRest(t.restSec) : finish();
+    }
+
     /** Rest between sets. Skippable — nobody wants to be held hostage. */
     function showRest(sec: number) {
       const next = live.tracks[live.si >= live.tracks[live.ti]!.sets ? Math.min(live.ti + 1, live.tracks.length - 1) : live.ti]!;
+      teardown();
       root.innerHTML = `
         <p class="eyebrow phase-note">Intermission</p>
         ${ring(sec)}
         <p class="meta phase-note">Up next · ${next.stage}</p>
-        <button class="btn btn-ice" id="skip" type="button">Skip the break</button>`;
-      countdown(sec, advance);
-      document.getElementById('skip')!.onclick = () => { stop(); advance(); };
+        ${art(next)}
+        ${controls(
+          '<button class="btn btn-ice" id="skip" type="button">Skip the break</button>',
+          '<button class="btn btn-ghost" id="t-main" type="button">Pause</button>',
+        )}`;
+      flip = mountFlip();
+      active = mountClock({ total: sec, mode: 'down', startLabel: 'Start the break', autostart: true, onDone: advance });
+      document.getElementById('skip')!.onclick = () => { teardown(); advance(); };
     }
 
     function showWork() {
       const t = live.tracks[live.ti]!;
       save();
+      teardown();
 
       if (t.mode === 'hold') {
         root.innerHTML = `
@@ -182,22 +378,25 @@ import Shell from '../../layouts/Shell.astro';
           <p class="target">Hold ${mmss(t.target)}</p>
           ${art(t)}
           <ul class="cues" id="cues"></ul>
-          <div class="row">
-            <button class="btn" id="start" type="button">Start the hold</button>
-          </div>`;
+          ${controls(
+            '<button class="btn btn-ice" id="t-main" type="button">Start the hold</button>',
+            '<button class="btn btn-ghost" id="bail" type="button" disabled>Call it</button>',
+          )}`;
         cues(t);
-        document.getElementById('start')!.onclick = () => {
-          const btn = document.getElementById('start') as HTMLButtonElement;
-          btn.disabled = true;
-          btn.textContent = 'Holding…';
-          countdown(t.target, () => {
-            t.actual += t.target;
-            t.setsDone++;
-            live.si++;
-            save();
-            live.si < t.sets || live.ti < live.tracks.length - 1 ? showRest(t.restSec) : finish();
-          });
-        };
+        flip = mountFlip();
+
+        // Pausing a hold needs a way out that isn't "wait out a clock you
+        // already quit on" — bank whatever you actually held.
+        const bail = document.getElementById('bail') as HTMLButtonElement;
+        const clock = mountClock({
+          total: t.target,
+          mode: 'down',
+          startLabel: 'Start the hold',
+          onState: (s) => { bail.disabled = !s.started; },
+          onDone: () => bank(t, t.target),
+        });
+        active = clock;
+        bail.onclick = () => { teardown(); bank(t, clock.elapsed()); };
       } else {
         root.innerHTML = `
           ${header(t, live.ti)}
@@ -208,25 +407,25 @@ import Shell from '../../layouts/Shell.astro';
             <output id="count" aria-live="polite">${t.target}</output>
             <button type="button" id="up" aria-label="One more rep">+</button>
           </div>
+          ${ring(0, true)}
           ${art(t)}
           <ul class="cues" id="cues"></ul>
-          <div class="row">
-            <button class="btn" id="done" type="button">Set done</button>
-          </div>`;
+          ${controls(
+            '<button class="btn" id="t-done" type="button">Set done</button>',
+            '<button class="btn btn-ghost" id="t-main" type="button">Start timer</button>',
+          )}`;
         cues(t);
+        flip = mountFlip();
+
+        // The rep set's clock is optional — it times you, it doesn't gate you.
+        active = mountClock({ total: 0, mode: 'up', startLabel: 'Start timer' });
 
         let n = t.target;
         const out = document.getElementById('count')!;
         const set = (v: number) => { n = Math.max(0, Math.min(999, v)); out.textContent = String(n); };
         document.getElementById('up')!.onclick = () => set(n + 1);
         document.getElementById('down')!.onclick = () => set(n - 1);
-        document.getElementById('done')!.onclick = () => {
-          t.actual += n;
-          t.setsDone++;
-          live.si++;
-          save();
-          live.si < t.sets || live.ti < live.tracks.length - 1 ? showRest(t.restSec) : finish();
-        };
+        document.getElementById('t-done')!.onclick = () => { teardown(); bank(t, n); };
       }
     }
 
